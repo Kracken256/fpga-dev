@@ -9,7 +9,8 @@ This repository contains a compact RV32 soft core targeting the Sipeed Tang Prim
 - `rtl/riscv_core.v`: CPU core logic
 - `rtl/uart_tx.v`: UART transmitter peripheral
 - `rtl/firmware_rom.v`: generated instruction ROM contents
-- `firmware/main.rs`: firmware source (Rust, no_std)
+- `firmware/src/main.rs`: firmware entrypoint (Rust, no_std)
+- `firmware/src/*.rs`: additional firmware modules
 - `firmware/build_rom.sh`: compiles Rust firmware and regenerates `rtl/firmware_rom.v`
 
 ## Current SoC Memory Map
@@ -24,11 +25,12 @@ LED mapping in `fpga/top.v`:
 
 ## Firmware Flow
 
-Firmware is authored in Rust (`firmware/main.rs`) and converted into a Verilog ROM module:
+Firmware is authored as a Cargo package in `firmware/src/` and converted into a Verilog ROM module:
 
-1. `rustc` compiles firmware for `riscv32i-unknown-none-elf`
-2. `llvm-objcopy` extracts raw binary
-3. `firmware/build_rom.sh` writes `rtl/firmware_rom.v`
+1. `cargo rustc` compiles firmware for `riscv32i-unknown-none-elf`
+2. Assembly is extracted to `firmware/build/main.s`
+3. `llvm-objcopy` extracts raw binary from ELF
+4. `firmware/build_rom.sh` writes `rtl/firmware_rom.v`
 
 The build script enforces the current ROM size limit (32 words).
 

@@ -2,3 +2,5 @@
 /target/
 /.venv/
 __pycache__/
+firmware/target/
+firmware/build/

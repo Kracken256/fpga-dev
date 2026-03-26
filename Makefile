@@ -11,7 +11,7 @@ CST := fpga/tang_primer_25k.cst
 SDC := fpga/tang_primer_25k.sdc
 
 FW_SCRIPT := firmware/build_rom.sh
-FW_SRC := firmware/main.rs firmware/linker.ld
+FW_SRC := firmware/Cargo.toml firmware/.cargo/config.toml firmware/linker.ld $(wildcard firmware/src/*.rs)
 FW_ROM := rtl/firmware_rom.v
 
 BUILD_DIR := build

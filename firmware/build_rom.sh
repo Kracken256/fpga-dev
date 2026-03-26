@@ -17,6 +17,11 @@ RUSTC=$(find_tool rustc) || {
     exit 1
 }
 
+CARGO=$(find_tool cargo) || {
+    echo "Error: cargo not found. Install Rust first (rustup)." >&2
+    exit 1
+}
+
 OBJCOPY=$(find_tool llvm-objcopy-18 llvm-objcopy) || {
     echo "Error: llvm-objcopy not found (looked for llvm-objcopy-18/llvm-objcopy)." >&2
     exit 1
@@ -37,21 +42,24 @@ fi
 
 echo "Building firmware..."
 
-# Compile and link Rust firmware for RV32I.
-"$RUSTC" \
-    --target "$TARGET" \
-    -C opt-level=s \
-    -C panic=abort \
-    -C lto=true \
-    -C code-model=small \
-    -C relocation-model=static \
-    -C linker=rust-lld \
-    -C link-arg=-Tlinker.ld \
-    main.rs \
-    -o main.elf
+# Compile and link Rust firmware package and emit assembly.
+"$CARGO" rustc --release --target "$TARGET" -- --emit=asm,link
+
+ELF="target/$TARGET/release/firmware"
+if [ ! -f "$ELF" ]; then
+    echo "Error: expected ELF not found at $ELF" >&2
+    exit 1
+fi
+
+ASM_FILE=$(ls -t target/$TARGET/release/deps/*.s 2>/dev/null | head -n 1)
+if [ -n "$ASM_FILE" ]; then
+    mkdir -p build
+    cp "$ASM_FILE" build/main.s
+    echo "✓ Extracted assembly to build/main.s"
+fi
 
 # Extract binary
-"$OBJCOPY" -O binary main.elf main.bin
+"$OBJCOPY" -O binary "$ELF" main.bin
 
 # Generate Verilog ROM from binary
 python3 > ../rtl/firmware_rom.v << 'PYTHON'
@@ -107,5 +115,5 @@ echo "✓ Generated ../rtl/firmware_rom.v"
 # Show disassembly for debugging
 echo ""
 echo "=== Disassembly ==="
-"$OBJDUMP" -d main.elf
-rm main.elf main.bin
+"$OBJDUMP" -d "$ELF"
+rm main.bin

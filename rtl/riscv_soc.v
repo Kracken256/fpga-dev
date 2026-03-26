@@ -16,18 +16,22 @@ wire data_re;
 wire data_we;
 wire [31:0] data_addr;
 wire [31:0] data_wdata;
+wire [3:0] data_wstrb;
 wire [31:0] data_rdata;
+wire [31:0] data_rom_rdata;
 
 reg [31:0] gpio_reg;
 reg [7:0] uart_wdata;
 wire uart_tx_ready;
+wire gpio_sel = (data_addr[31:2] == GPIO_ADDR[31:2]);
+wire uart_sel = (data_addr[31:2] == UART_ADDR[31:2]);
+wire uart_tx_valid = data_we && uart_sel && (|data_wstrb);
 
 assign gpio_out = gpio_reg;
-assign data_rdata = (data_re && (data_addr == GPIO_ADDR)) ? gpio_reg :
-                    (data_re && (data_addr == UART_ADDR)) ? {31'd0, uart_tx_ready} :
+assign data_rdata = (data_re && gpio_sel) ? gpio_reg :
+                    (data_re && uart_sel) ? {31'd0, uart_tx_ready} :
+                    (data_re && (data_addr[31:7] == 25'd0)) ? data_rom_rdata :
                     32'd0;
-
-wire uart_tx_valid = data_we && (data_addr == UART_ADDR);
 
 always @(posedge clk) begin
     if (!&reset_cnt)
@@ -38,10 +42,21 @@ always @(posedge clk) begin
         uart_wdata <= 8'd0;
     end
     else begin
-        if (data_we && (data_addr == GPIO_ADDR))
-            gpio_reg <= data_wdata;
-        if (data_we && (data_addr == UART_ADDR))
-            uart_wdata <= data_wdata[7:0];
+        if (data_we && gpio_sel) begin
+            if (data_wstrb[0]) gpio_reg[7:0]   <= data_wdata[7:0];
+            if (data_wstrb[1]) gpio_reg[15:8]  <= data_wdata[15:8];
+            if (data_wstrb[2]) gpio_reg[23:16] <= data_wdata[23:16];
+            if (data_wstrb[3]) gpio_reg[31:24] <= data_wdata[31:24];
+        end
+
+        if (data_we && uart_sel && (|data_wstrb)) begin
+            case (data_addr[1:0])
+                2'b00: uart_wdata <= data_wdata[7:0];
+                2'b01: uart_wdata <= data_wdata[15:8];
+                2'b10: uart_wdata <= data_wdata[23:16];
+                default: uart_wdata <= data_wdata[31:24];
+            endcase
+        end
     end
 end
 
@@ -54,12 +69,18 @@ riscv_core u_riscv_core (
     .data_we(data_we),
     .data_addr(data_addr),
     .data_wdata(data_wdata),
+    .data_wstrb(data_wstrb),
     .data_rdata(data_rdata)
 );
 
 firmware_rom u_firmware_rom (
     .addr(instr_addr),
     .data(instr_rdata)
+);
+
+firmware_rom u_firmware_rom_data (
+    .addr(data_addr),
+    .data(data_rom_rdata)
 );
 
 uart_tx u_uart_tx (
