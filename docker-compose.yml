@@ -1,0 +1,24 @@
+services:
+  fpga:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: riscv-soft-core:dev
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    volumes:
+      - .:/workspace
+
+  fpga-usb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: riscv-soft-core:dev
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    privileged: true
+    volumes:
+      - .:/workspace
+      - /dev/bus/usb:/dev/bus/usb

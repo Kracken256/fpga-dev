@@ -72,6 +72,9 @@ for i in range(0, len(data), 4):
     words.append(word)
 
 # Generate Verilog
+print("// Auto-generated firmware ROM from main.bin")
+print("// Contains {} words ({} bytes)".format(len(words), len(data)))
+print()
 print("module firmware_rom (")
 print("    input wire [31:0] addr,")
 print("    output reg [31:0] data")

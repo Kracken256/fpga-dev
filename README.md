@@ -1,104 +1,135 @@
 # Tang Primer 25K RISC-V Soft Core
 
-This repository contains a compact RV32 soft core implementation targeting the Tang Primer 25K (GW5A-LV25MG121NC1/I0) with a fully open-source build flow.
+This repository contains a compact RV32 soft core targeting the Sipeed Tang Primer 25K (GW5A-LV25MG121NC1/I0), with a Docker-first open-source build flow.
 
 ## Design Overview
 
-- `fpga/top.v` is a thin board wrapper (clock + LED pins).
-- `rtl/riscv_soc.v` contains the SoC integration (reset, ROM, GPIO peripheral).
-- `rtl/riscv_core.v` contains the CPU core only.
-- `rtl/firmware_rom.v` contains the firmware image (instruction ROM contents).
-- The current SoC has memory-mapped GPIO and ROM-backed instruction fetch.
-- `fpga/tang_primer_25k.cst` contains board pin constraints.
-- `fpga/tang_primer_25k.sdc` contains a 50 MHz timing constraint.
+- `fpga/top.v`: board wrapper and pin-level I/O
+- `rtl/riscv_soc.v`: SoC integration (reset, ROM hookup, GPIO/UART map)
+- `rtl/riscv_core.v`: CPU core logic
+- `rtl/uart_tx.v`: UART transmitter peripheral
+- `rtl/firmware_rom.v`: generated instruction ROM contents
+- `firmware/main.rs`: firmware source (Rust, no_std)
+- `firmware/build_rom.sh`: compiles Rust firmware and regenerates `rtl/firmware_rom.v`
 
-## CPU and SoC Details
+## Current SoC Memory Map
 
-- ISA coverage: compact RV32I subset used by the bundled firmware (loads/stores, ALU ops, branches, jumps, LUI/AUIPC).
-- Reset: internal power-on reset counter.
-- Memory map:
-  - `0x4000_0000`: GPIO output register
-- LED mapping:
-  - `led0` = `GPIO[0]`
-  - `led1` = inverse of `GPIO[0]`
+- `0x4000_0000`: GPIO output register
+- `0x4000_0004`: UART TX write / UART ready read
 
-## Included Firmware
+LED mapping in `fpga/top.v`:
 
-The ROM contains a simple hand-coded RISC-V program that:
+- `led0` = `GPIO[0]`
+- `led1` = inverse of `GPIO[0]`
 
-1. Sets up the GPIO base address.
-2. Runs a software delay loop.
-3. Writes an incrementing value to GPIO.
+## Firmware Flow
 
-Result: `led0` blinks under software control from the RISC-V core, and `led1` mirrors the inverse state.
+Firmware is authored in Rust (`firmware/main.rs`) and converted into a Verilog ROM module:
 
-## Toolchain Requirements
+1. `rustc` compiles firmware for `riscv32i-unknown-none-elf`
+2. `llvm-objcopy` extracts raw binary
+3. `firmware/build_rom.sh` writes `rtl/firmware_rom.v`
 
-Install these tools:
+The build script enforces the current ROM size limit (32 words).
 
-- `yosys`
-- `nextpnr-himbaechel` (with Gowin support)
-- `gowin_pack`
-- `openFPGALoader` (optional, only needed for `make program`)
+Current firmware behavior:
 
-## Make Targets
+- Writes `"Hello, World!\n"` to UART once
+- Enters an infinite loop
 
-- `make check-tools`
-  - Verifies required tools are available in PATH.
-- `make synth`
-  - Runs Yosys and generates `build/top.json`.
-- `make pnr`
-  - Runs nextpnr-himbaechel and generates `build/top_pnr.json`.
-- `make pack` or `make bitstream`
-  - Runs gowin_pack and generates `build/top.fs`.
-- `make program`
-  - Programs the board using an existing `build/top.fs`.
-- `make program-build`
-  - Builds and then programs in one command.
-- `make clean`
-  - Removes the `build/` directory.
+## Docker-Only Workflow
 
-## Build
+The Makefile is Docker-only at the host level. Running normal targets like `make bitstream` or `make program-build` will execute inside the container image `riscv-soft-core:dev`.
+
+### Prerequisite
+
+- Docker
+
+### Main Commands
+
+Build image:
+
+```sh
+make docker-build
+```
+
+Open shell in container:
+
+```sh
+make docker-shell
+```
+
+Generate firmware ROM only:
+
+```sh
+make firmware
+```
+
+Build bitstream:
 
 ```sh
 make bitstream
 ```
 
-Generated output:
-
-- `build/top.fs`
-
-## Program the Board
+Program existing bitstream:
 
 ```sh
 make program
 ```
 
-This target expects an existing bitstream (`build/top.fs`) and then runs:
+Build and program:
 
 ```sh
-openFPGALoader -b tangprimer25k build/top.fs
+make program-build
 ```
 
-If your Linux user does not have USB permissions for the FTDI interface, use:
+Notes:
+
+- `make program` and `make program-build` use a privileged container and mount `/dev/bus/usb`.
+- If image `riscv-soft-core:dev` does not exist, Makefile auto-builds it.
+
+## Docker Compose (Optional)
+
+The repository also includes `docker-compose.yml` with two services:
+
+- `fpga`: build-only workflows
+- `fpga-usb`: privileged USB passthrough for programming
+
+Examples:
 
 ```sh
-sudo make program
+docker compose run --rm fpga make IN_DOCKER=1 _bitstream
+docker compose run --rm fpga-usb make IN_DOCKER=1 _program-build
 ```
 
-Typical workflow:
+## Make Targets
 
-```sh
-make bitstream
-sudo make program
-```
+Public host-level targets:
 
-## Pin Notes
+- `make check-tools` (checks Docker only)
+- `make docker-build`
+- `make docker-shell`
+- `make firmware`
+- `make synth`
+- `make pnr`
+- `make pack`
+- `make bitstream`
+- `make program`
+- `make program-build`
+- `make clean`
 
-Current constraints are set to:
+Internal in-container targets (used by Makefile forwarding):
 
-- `clk50` -> `E2`
-- `led0` -> `E8`
-- `led1` -> `D7`
+- `_check-tools`, `_firmware`, `_synth`, `_pnr`, `_pack`, `_bitstream`, `_program`, `_program-build`
 
-If your board revision or dock mapping differs, edit `fpga/tang_primer_25k.cst`.
+## Build Artifacts
+
+- `build/top.json`: synthesized netlist
+- `build/top_pnr.json`: placed/routed netlist
+- `build/top.fs`: final bitstream
+
+## Constraints
+
+- Pin constraints: `fpga/tang_primer_25k.cst`
+- Timing constraints: `fpga/tang_primer_25k.sdc`
+- Target frequency: 50 MHz
