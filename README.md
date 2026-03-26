@@ -5,16 +5,17 @@ This repository contains a compact RV32 soft core targeting the Sipeed Tang Prim
 ## Design Overview
 
 - `fpga/top.v`: board wrapper and pin-level I/O
-- `rtl/riscv_soc.v`: SoC integration (reset, ROM hookup, GPIO/UART map)
-- `rtl/riscv_core.v`: CPU core logic
+- `rtl/riscv_soc.v`: SoC integration (reset, single-bus shared memory hookup, GPIO/UART map)
+- `rtl/riscv_core.v`: CPU core logic (fetch/execute over one shared memory port)
 - `rtl/uart_tx.v`: UART transmitter peripheral
-- `rtl/firmware_rom.v`: generated instruction ROM contents
+- `rtl/firmware_rom.v`: generated shared firmware memory contents
 - `firmware/src/main.rs`: firmware entrypoint (Rust, no_std)
 - `firmware/src/*.rs`: additional firmware modules
 - `firmware/build_rom.sh`: compiles Rust firmware and regenerates `rtl/firmware_rom.v`
 
 ## Current SoC Memory Map
 
+- `0x0000_0000` - `0x0000_007F`: shared firmware memory (instruction + load reads)
 - `0x4000_0000`: GPIO output register
 - `0x4000_0004`: UART TX write / UART ready read
 
@@ -73,7 +74,7 @@ Build bitstream:
 make bitstream
 ```
 
-Program existing bitstream:
+Program existing bitstream (persistent, writes on-board flash):
 
 ```sh
 make program
@@ -88,6 +89,7 @@ make program-build
 Notes:
 
 - `make program` and `make program-build` use a privileged container and mount `/dev/bus/usb`.
+- `make program` now programs flash (`openFPGALoader -f`), so the bitstream persists after power cycle.
 - If image `riscv-soft-core:dev` does not exist, Makefile auto-builds it.
 
 ## Docker Compose (Optional)

@@ -1,5 +1,5 @@
-// Simple UART transmitter for 115200 baud @ 50 MHz clock
-// 50_000_000 / 115_200 = 434 clock cycles per bit
+// Simple UART transmitter for 9600 baud @ 50 MHz clock
+// 50_000_000 / 9_600 = 5208 clock cycles per bit
 
 module uart_tx (
     input wire clk,
@@ -11,8 +11,8 @@ module uart_tx (
 );
 
     // Baud rate: divisor = clock_freq / baud_rate
-    localparam DIVISOR = 434;
-    localparam DIVISOR_WIDTH = 9;
+    localparam DIVISOR = 5208;
+    localparam DIVISOR_WIDTH = 13;
 
     reg [3:0] bit_cnt;
     reg [DIVISOR_WIDTH-1:0] clk_cnt;
