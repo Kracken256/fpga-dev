@@ -94,7 +94,7 @@ _bitstream: _pack
 
 _program:
 	@test -f $(BITSTREAM) || (echo "Missing bitstream: $(BITSTREAM). Run 'make bitstream' first." && exit 1)
-	$(PROGRAMMER) -b tangprimer25k $(BITSTREAM)
+	$(PROGRAMMER) -b tangprimer25k -f $(BITSTREAM)
 
 _program-build: _bitstream _program
 
