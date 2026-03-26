@@ -6,7 +6,7 @@ DEVICE := GW5A-LV25MG121NC1/I0
 # Family name used by both nextpnr vopt and gowin_pack.
 FAMILY := GW5A-25A
 
-RTL := fpga/$(TOP).v
+RTL := fpga/$(TOP).v rtl/riscv_core.v rtl/riscv_soc.v rtl/firmware_rom.v
 CST := fpga/tang_primer_25k.cst
 SDC := fpga/tang_primer_25k.sdc
 

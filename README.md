@@ -1,20 +1,36 @@
-# Tang Primer 25K Setup
+# Tang Primer 25K RISC-V Soft Core
 
-This repository now includes a complete open-source FPGA flow for the Tang Primer 25K (GW5A-LV25MG121NC1/I0).
+This repository contains a compact RV32 soft core implementation targeting the Tang Primer 25K (GW5A-LV25MG121NC1/I0) with a fully open-source build flow.
 
-## What Was Added
+## Design Overview
 
-- `fpga/top.v`: minimal LED blinker top module.
-- `fpga/tang_primer_25k.cst`: board pin constraints.
-- `fpga/tang_primer_25k.sdc`: 50 MHz clock timing constraint.
-- `Makefile`: build, pack, and flash targets.
+- `fpga/top.v` is a thin board wrapper (clock + LED pins).
+- `rtl/riscv_soc.v` contains the SoC integration (reset, ROM, GPIO peripheral).
+- `rtl/riscv_core.v` contains the CPU core only.
+- `rtl/firmware_rom.v` contains the firmware image (instruction ROM contents).
+- The current SoC has memory-mapped GPIO and ROM-backed instruction fetch.
+- `fpga/tang_primer_25k.cst` contains board pin constraints.
+- `fpga/tang_primer_25k.sdc` contains a 50 MHz timing constraint.
 
-## LED Behavior
+## CPU and SoC Details
 
-- Clock source is assumed to be 50 MHz (`clk50`).
-- `led0` toggles every 5 seconds.
-- `led1` is always the inverse of `led0`.
-- A full `led0` blink cycle (on -> off -> on) is 10 seconds.
+- ISA coverage: compact RV32I subset used by the bundled firmware (loads/stores, ALU ops, branches, jumps, LUI/AUIPC).
+- Reset: internal power-on reset counter.
+- Memory map:
+  - `0x4000_0000`: GPIO output register
+- LED mapping:
+  - `led0` = `GPIO[0]`
+  - `led1` = inverse of `GPIO[0]`
+
+## Included Firmware
+
+The ROM contains a simple hand-coded RISC-V program that:
+
+1. Sets up the GPIO base address.
+2. Runs a software delay loop.
+3. Writes an incrementing value to GPIO.
+
+Result: `led0` blinks under software control from the RISC-V core, and `led1` mirrors the inverse state.
 
 ## Toolchain Requirements
 
